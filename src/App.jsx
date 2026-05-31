@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth'
 import { auth } from './firebase'
 import Auth from './components/Auth'
 import Navbar from './components/Navbar'
@@ -16,6 +16,7 @@ export default function App() {
   const [view, setView] = useState('today')
 
   useEffect(() => {
+    getRedirectResult(auth).catch(() => {})
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u)
       setLoading(false)
