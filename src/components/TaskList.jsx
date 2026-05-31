@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTasks } from '../hooks/useTasks'
 import TaskForm from './TaskForm'
-import TaskItem from './TaskItem'
+import TaskNode from './TaskNode'
 
 const FILTERS = ['Active', 'All', 'Completed']
 const CATEGORIES = ['All', 'Work', 'Personal', 'Health', 'Other']
@@ -11,6 +11,7 @@ export default function TaskList({ user }) {
   const { tasks, loading, addTask, updateTask, toggleTask, deleteTask } = useTasks(user.uid)
   const [showForm, setShowForm] = useState(false)
   const [editTask, setEditTask] = useState(null)
+  const [addingSubtaskTo, setAddingSubtaskTo] = useState(null)
   const [filter, setFilter] = useState('Active')
   const [category, setCategory] = useState('All')
   const [priority, setPriority] = useState('All')
@@ -19,15 +20,21 @@ export default function TaskList({ user }) {
     if (editTask) {
       await updateTask(editTask.id, form)
     } else {
-      await addTask(form)
+      await addTask({ ...form, parentId: addingSubtaskTo || null })
     }
     setEditTask(null)
+    setAddingSubtaskTo(null)
   }
 
   const handleEdit = (task) => { setEditTask(task); setShowForm(true) }
-  const handleClose = () => { setShowForm(false); setEditTask(null) }
+  const handleClose = () => { setShowForm(false); setEditTask(null); setAddingSubtaskTo(null) }
+  const handleAddSubtask = (parentId) => { setAddingSubtaskTo(parentId); setShowForm(true) }
 
-  const filtered = tasks.filter(t => {
+  const parentTask = addingSubtaskTo ? tasks.find(t => t.id === addingSubtaskTo) : null
+
+  // Filter applies only to root tasks; their children always render with them
+  const rootTasks = tasks.filter(t => !t.parentId)
+  const filtered = rootTasks.filter(t => {
     if (filter === 'Active' && t.completed) return false
     if (filter === 'Completed' && !t.completed) return false
     if (category !== 'All' && t.category !== category) return false
@@ -36,6 +43,14 @@ export default function TaskList({ user }) {
   })
 
   const doneCount = tasks.filter(t => t.completed).length
+
+  const nodeProps = {
+    allTasks: tasks,
+    onToggle: toggleTask,
+    onEdit: handleEdit,
+    onDelete: deleteTask,
+    onAddSubtask: handleAddSubtask,
+  }
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -95,14 +110,17 @@ export default function TaskList({ user }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(t => (
-            <TaskItem key={t.id} task={t} onToggle={toggleTask} onEdit={handleEdit} onDelete={deleteTask} />
-          ))}
+          {filtered.map(t => <TaskNode key={t.id} task={t} {...nodeProps} />)}
         </div>
       )}
 
       {(showForm || editTask) && (
-        <TaskForm task={editTask} onSave={handleSave} onClose={handleClose} />
+        <TaskForm
+          task={editTask}
+          parentTaskTitle={parentTask?.title}
+          onSave={handleSave}
+          onClose={handleClose}
+        />
       )}
     </div>
   )

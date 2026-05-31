@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 const PRIORITIES = ['High', 'Medium', 'Low']
 const CATEGORIES = ['Work', 'Personal', 'Health', 'Other']
 
-export default function TaskForm({ task, defaultDate, onSave, onClose }) {
+export default function TaskForm({ task, defaultDate, parentTaskTitle, onSave, onClose }) {
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -33,6 +33,8 @@ export default function TaskForm({ task, defaultDate, onSave, onClose }) {
     onClose()
   }
 
+  const title = task ? 'Edit Task' : parentTaskTitle ? `Add Subtask` : 'New Task'
+
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4"
@@ -43,7 +45,12 @@ export default function TaskForm({ task, defaultDate, onSave, onClose }) {
         onClick={e => e.stopPropagation()}
       >
         <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">{task ? 'Edit Task' : 'New Task'}</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">{title}</h2>
+          {parentTaskTitle && (
+            <p className="text-xs text-indigo-600 mb-4 bg-indigo-50 px-3 py-1.5 rounded-lg">
+              ↳ under: <span className="font-medium">{parentTaskTitle}</span>
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
               type="text"

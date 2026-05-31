@@ -1,31 +1,46 @@
 import { useState } from 'react'
 import { useTasks } from '../hooks/useTasks'
 import TaskForm from './TaskForm'
-import TaskItem from './TaskItem'
+import TaskNode from './TaskNode'
 
 export default function Today({ user }) {
   const { tasks, loading, addTask, updateTask, toggleTask, deleteTask } = useTasks(user.uid)
   const [showForm, setShowForm] = useState(false)
   const [editTask, setEditTask] = useState(null)
+  const [addingSubtaskTo, setAddingSubtaskTo] = useState(null) // parentId
 
   const today = new Date().toISOString().split('T')[0]
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-  const todayTasks = tasks.filter(t => t.dueDate === today)
-  const overdueTasks = tasks.filter(t => t.dueDate && t.dueDate < today && !t.completed)
-  const noDueTasks = tasks.filter(t => !t.dueDate && !t.completed)
+  // Only show root tasks in each bucket (children are rendered inside TaskNode)
+  const rootTasks = tasks.filter(t => !t.parentId)
+  const todayTasks = rootTasks.filter(t => t.dueDate === today)
+  const overdueTasks = rootTasks.filter(t => t.dueDate && t.dueDate < today && !t.completed)
+  const noDueTasks = rootTasks.filter(t => !t.dueDate && !t.completed)
 
   const handleSave = async (form) => {
     if (editTask) {
       await updateTask(editTask.id, form)
     } else {
-      await addTask({ ...form, dueDate: today })
+      await addTask({ ...form, dueDate: form.dueDate || today, parentId: addingSubtaskTo || null })
     }
     setEditTask(null)
+    setAddingSubtaskTo(null)
   }
 
   const handleEdit = (task) => { setEditTask(task); setShowForm(true) }
-  const handleClose = () => { setShowForm(false); setEditTask(null) }
+  const handleClose = () => { setShowForm(false); setEditTask(null); setAddingSubtaskTo(null) }
+  const handleAddSubtask = (parentId) => { setAddingSubtaskTo(parentId); setShowForm(true) }
+
+  const parentTask = addingSubtaskTo ? tasks.find(t => t.id === addingSubtaskTo) : null
+
+  const nodeProps = {
+    allTasks: tasks,
+    onToggle: toggleTask,
+    onEdit: handleEdit,
+    onDelete: deleteTask,
+    onAddSubtask: handleAddSubtask,
+  }
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -52,9 +67,7 @@ export default function Today({ user }) {
         <section>
           <h2 className="text-sm font-semibold text-red-500 mb-3">⚠️ Overdue ({overdueTasks.length})</h2>
           <div className="space-y-2">
-            {overdueTasks.map(t => (
-              <TaskItem key={t.id} task={t} onToggle={toggleTask} onEdit={handleEdit} onDelete={deleteTask} />
-            ))}
+            {overdueTasks.map(t => <TaskNode key={t.id} task={t} {...nodeProps} />)}
           </div>
         </section>
       )}
@@ -68,9 +81,7 @@ export default function Today({ user }) {
           </div>
         ) : (
           <div className="space-y-2">
-            {todayTasks.map(t => (
-              <TaskItem key={t.id} task={t} onToggle={toggleTask} onEdit={handleEdit} onDelete={deleteTask} />
-            ))}
+            {todayTasks.map(t => <TaskNode key={t.id} task={t} {...nodeProps} />)}
           </div>
         )}
       </section>
@@ -79,9 +90,7 @@ export default function Today({ user }) {
         <section>
           <h2 className="text-sm font-semibold text-gray-600 mb-3">No Due Date ({noDueTasks.length})</h2>
           <div className="space-y-2">
-            {noDueTasks.map(t => (
-              <TaskItem key={t.id} task={t} onToggle={toggleTask} onEdit={handleEdit} onDelete={deleteTask} />
-            ))}
+            {noDueTasks.map(t => <TaskNode key={t.id} task={t} {...nodeProps} />)}
           </div>
         </section>
       )}
@@ -90,6 +99,7 @@ export default function Today({ user }) {
         <TaskForm
           task={editTask}
           defaultDate={today}
+          parentTaskTitle={parentTask?.title}
           onSave={handleSave}
           onClose={handleClose}
         />

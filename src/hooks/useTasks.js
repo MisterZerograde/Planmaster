@@ -5,6 +5,11 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 
+function getAllDescendantIds(tasks, parentId) {
+  const children = tasks.filter(t => t.parentId === parentId)
+  return children.flatMap(c => [c.id, ...getAllDescendantIds(tasks, c.id)])
+}
+
 export function useTasks(userId) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -25,6 +30,7 @@ export function useTasks(userId) {
   const addTask = (task) =>
     addDoc(collection(db, 'users', userId, 'tasks'), {
       ...task,
+      parentId: task.parentId || null,
       completed: false,
       createdAt: serverTimestamp(),
     })
@@ -35,8 +41,11 @@ export function useTasks(userId) {
   const toggleTask = (id, completed) =>
     updateDoc(doc(db, 'users', userId, 'tasks', id), { completed: !completed })
 
-  const deleteTask = (id) =>
-    deleteDoc(doc(db, 'users', userId, 'tasks', id))
+  // Deletes task and all its descendants recursively
+  const deleteTask = (id) => {
+    const ids = [id, ...getAllDescendantIds(tasks, id)]
+    return Promise.all(ids.map(tid => deleteDoc(doc(db, 'users', userId, 'tasks', tid))))
+  }
 
   return { tasks, loading, addTask, updateTask, toggleTask, deleteTask }
 }
